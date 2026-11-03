@@ -33,15 +33,17 @@
 </div>
 <div id="auth-active" hidden>
 <p>Playing as <span id="cloud-identity"></span></p>
-<p class="note">Save inside the Pokémon game first. Backup Now sends your current game save to your private Supabase account. Restore downloads your cloud save onto this device.</p>
-<div class="cloud-actions"><button id="backup-btn" type="button" disabled>Backup Now</button><button id="restore-btn" type="button" class="secondary" disabled>Restore Cloud Save</button><button id="export-btn" type="button" class="secondary" disabled>Export Local Save</button><button id="logout-btn" type="button" class="secondary">Log Out</button></div>
+<p class="note">Backup Now uploads both your in-game save and an instant snapshot (when supported). Resume Cloud Snapshot continues at the exact moment you backed up. Restore Game Save returns to the Pokémon title screen; select Continue there. Do not overwrite older cloud saves until you have verified your progress.</p>
+<div class="cloud-actions"><button id="backup-btn" type="button" disabled>☁️ Backup Now</button><button id="restore-btn" type="button" class="secondary" disabled>▶ Resume Cloud Snapshot</button><button id="restore-sav-btn" type="button" class="secondary" disabled>Restore Game Save (.sav)</button><button id="export-btn" type="button" class="secondary" disabled>Export Local Save</button><button id="import-btn" type="button" class="secondary" disabled>Import Old Save (.sav)</button><button id="logout-btn" type="button" class="secondary">Log Out</button></div>
+<input id="import-sav-file" type="file" accept=".sav,.srm,.save,application/octet-stream" hidden>
+<p class="note" id="cloud-help">Game Save = Pokémon's normal Save/Continue menu. Snapshot = instantly resumes where you were. Cloud files are only transferred using the matching buttons above.</p>
 </div>
 <p id="cloud-message" role="status"></p>
 </section>
 <div id="screen"><div id="game"></div></div>
 <p id="status" role="status"></p><p id="error" role="alert"></p>
 <section class="controls" aria-labelledby="controls-title"><h2 id="controls-title">Keyboard controls</h2><table><thead><tr><th scope="col">Action</th><th scope="col">Key</th></tr></thead><tbody><tr><td>Move</td><td><kbd>↑ ↓ ← →</kbd></td></tr><tr><td>A — confirm / interact</td><td><kbd>Z</kbd></td></tr><tr><td>B — back / cancel</td><td><kbd>X</kbd></td></tr><tr><td>Start — game menu</td><td><kbd>Enter</kbd></td></tr><tr><td>Select</td><td><kbd>V</kbd></td></tr><tr><td>L</td><td><kbd>Q</kbd></td></tr><tr><td>R</td><td><kbd>E</kbd></td></tr><tr class="ds-only" hidden><td>DS X — menu</td><td><kbd>A</kbd></td></tr><tr class="ds-only" hidden><td>DS Y</td><td><kbd>S</kbd></td></tr><tr class="ds-only" hidden><td>DS touchscreen</td><td>Click / tap the bottom screen</td></tr></tbody></table><p class="note">Click inside the game before using the keyboard. These are the standard bindings; if you have changed them, open the emulator’s Controls settings to see your current keys.</p></section>
-<p class="note">Save using the game's Save menu. Guest saves remain on this browser and device. Signed-in cloud backups are stored privately for your account. Always keep exported backup saves. Clearing your browser data can delete unsynced progress.</p>
+<p class="note">Save using the game's Save menu. Guest saves remain on this browser and device. Signed-in cloud backups are stored privately for your account. Backups are not restored automatically: select Resume Cloud Snapshot or Restore Game Save. Always keep exported backup saves. Clearing your browser data can delete unsynced progress.</p>
 <p class="note">Powered by <a href="https://emulatorjs.org/">EmulatorJS</a> and mGBA.</p>
 </main>
 <script>
@@ -59,6 +61,7 @@ const selected = games.find(g => g.slug === requested) || games[0];
 const $ = id => document.getElementById(id);
 let session = null, chosenMode = '', emulatorStarted = false, cloudPresent = false;
 let syncEnabled = false, syncTimer = null, uploadBusy = false, pendingBytes = null, lastUploadedDigest = '';
+let cloudSavPresent = false, cloudStatePresent = false, cloudOperationBusy = false;
 let loadingStarted = false;
 
 document.title = selected.name + ' Player';
@@ -160,73 +163,155 @@ async function launch(mode) {
  if (mode==='account') await checkCloudStatus();
  await startPlayer();
 }
-function savePath() { return `${session.user_id}/${selected.slug}.sav`; }
+// Each player has separate storage paths; both names are covered by the existing
+// bucket policy that limits access to their own auth.uid() folder.
+function savePath(ext='sav') { return `${session.user_id}/${selected.slug}.${ext}`; }
+function objectUrl(ext='sav', authenticated=true) {
+ return `${SUPABASE_URL}/storage/v1/object/${authenticated?'authenticated/':''}${BUCKET}/${savePath(ext)}`;
+}
+async function cloudExists(ext) {
+ const res=await fetch(objectUrl(ext),{method:'HEAD',headers:headers(await validToken()),cache:'no-store'});
+ if (res.status===404) return false;
+ if (!res.ok) throw Error(await parseError(res));
+ return true;
+}
 async function checkCloudStatus() {
  try {
-  const r=await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${savePath()}`, {
-   headers:headers(await validToken()), cache:'no-store'
-  });
-  if (r.status===404 || r.status===400) {cloudPresent=false;syncEnabled=true;info('No cloud save found for this game yet. Automatic backup is enabled.');return;}
-  if (!r.ok) throw Error(await parseError(r));
-  cloudPresent=true;syncEnabled=false;
-  info('Cloud save found. Use Restore Cloud Save, or Backup Now to replace it with progress from this device. Automatic uploads are paused to avoid overwriting it.');
- } catch(e) { syncEnabled=false;info('Could not check cloud storage: '+e.message+'. Auto backup is paused.',true); }
+  const [sav,state]=await Promise.all([cloudExists('sav'), cloudExists('state')]);
+  cloudSavPresent=sav;cloudStatePresent=state;cloudPresent=sav||state;
+  // Never auto-overwrite an existing remote save just because this device loaded.
+  syncEnabled=!cloudPresent;
+  if (!cloudPresent) info('No cloud backup yet. Save in Pokémon, then tap Backup Now for your first verified backup.');
+  else info(`Cloud files found for ${selected.name}: ${sav?'game save ':''}${state?'snapshot':''}. Use the appropriate Restore button before saving or uploading from this device.`);
+ } catch(e) {syncEnabled=false;info('Could not check cloud storage: '+e.message+'. Auto backup is paused.',true);}
 }
 async function digest(bytes) {
  const result=await crypto.subtle.digest('SHA-256',bytes);
  return [...new Uint8Array(result)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
-async function uploadSave(bytes, quiet=false) {
+async function fetchCloudFile(ext) {
+ const res=await fetch(objectUrl(ext),{headers:headers(await validToken()),cache:'no-store'});
+ if (!res.ok) throw Error(res.status===404?`There is no cloud ${ext==='state'?'snapshot':'game save'} for ${selected.name}.`:await parseError(res));
+ const data=new Uint8Array(await res.arrayBuffer());
+ if (data.byteLength<128) throw Error('The cloud '+ext+' file is empty or invalid.');
+ return data;
+}
+async function uploadObject(ext,bytes,verify=false) {
  if (chosenMode!=='account' || !session) throw Error('Log in first.');
- if (!bytes || bytes.byteLength<128) throw Error('There is no usable in-game save yet. Save from the Pokémon game menu first.');
- const token=await validToken();
- const res=await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${savePath()}`, {
-  method:'POST',headers:{...headers(token,'application/octet-stream'),'x-upsert':'true','cache-control':'no-cache'},
+ if (!bytes || bytes.byteLength<128) throw Error('There is no usable '+ext+' data to back up.');
+ const res=await fetch(objectUrl(ext,false),{
+  method:'POST',headers:{...headers(await validToken(),'application/octet-stream'),'x-upsert':'true','cache-control':'no-cache'},
   body:new Blob([bytes],{type:'application/octet-stream'})
  });
  if (!res.ok) throw Error(await parseError(res));
- cloudPresent=true;
- if (!quiet) info('Cloud backup successful! Your '+selected.name+' save is stored in your account.');
+ if (verify) {
+  const downloaded=await fetchCloudFile(ext);
+  if (downloaded.byteLength!==bytes.byteLength || (await digest(downloaded))!==(await digest(bytes))) {
+   throw Error('Cloud '+ext+' verification failed. Keep your local save; do not delete it.');
+  }
+ }
+ if (ext==='sav') cloudSavPresent=true;
+ if (ext==='state') cloudStatePresent=true;
+ cloudPresent=cloudSavPresent||cloudStatePresent;
 }
-function getLocalSave() {
- if (!emulatorStarted || !window.EJS_emulator?.gameManager) throw Error('Start the game first.');
- return window.EJS_emulator.gameManager.getSaveFile(true);
+function getManager() {
+ if (!emulatorStarted || !window.EJS_emulator?.gameManager) throw Error('Start the Pokémon game first.');
+ return window.EJS_emulator.gameManager;
+}
+function getLocalSave() { return getManager().getSaveFile(true); }
+function setBusy(isBusy) {
+ cloudOperationBusy=isBusy;
+ for (const id of ['backup-btn','restore-btn','restore-sav-btn','export-btn','import-btn']) $(id).disabled=isBusy||!emulatorStarted;
 }
 async function backupNow() {
+ if (cloudOperationBusy) return;
  try {
-  const save=getLocalSave();
-  if (!save || save.byteLength<128) throw Error('No in-game save found. Use the game’s Save option first.');
-  if (cloudPresent && !confirm('Replace your existing cloud save for '+selected.name+' with this device’s current save?')) return;
-  info('Uploading your save…');
-  await uploadSave(save);
-  lastUploadedDigest=await digest(save);
-  syncEnabled=true;
+  const manager=getManager();
+  if (cloudPresent && !confirm('Overwrite the existing cloud backup for '+selected.name+' with this device’s current progress? Make sure the game shows your actual saved progress first.')) return;
+  setBusy(true);
+  // Disable auto-upload during manual backup so it cannot race with these writes.
+  const wasSyncEnabled=syncEnabled;syncEnabled=false;
+  info('Collecting current game save and instant snapshot…');
+  const sav=manager.getSaveFile(true);
+  let state=null, stateError=null;
+  try {state=manager.getState();} catch(e) {stateError=e;}
+  if ((!sav||sav.byteLength<128) && (!state||state.byteLength<128)) {
+   syncEnabled=wasSyncEnabled;
+   throw Error('No usable save data found. Use the Pokémon Save menu, then retry.');
+  }
+  const succeeded=[];const failed=[];
+  if (sav?.byteLength>=128) {
+   try {info('Uploading and verifying in-game save…');await uploadObject('sav',sav,true);succeeded.push('game save');lastUploadedDigest=await digest(sav);}
+   catch(e) {failed.push('game save: '+e.message);}
+  }
+  if (state?.byteLength>=128) {
+   try {info('Uploading and verifying instant snapshot…');await uploadObject('state',state,true);succeeded.push('snapshot');}
+   catch(e) {failed.push('snapshot: '+e.message);}
+  } else if (stateError) failed.push('snapshot unsupported: '+stateError.message);
+  // Only allow future autosync after an explicit successful SAV upload.
+  syncEnabled=succeeded.includes('game save');
+  if (!succeeded.length) throw Error(failed.join(' | ')||'Nothing was uploaded.');
+  info(`☁️ VERIFIED: ${succeeded.join(' + ')} backed up for ${selected.name} at ${new Date().toLocaleTimeString()}. ${failed.length?'Warning: '+failed.join(' | '):'Use Resume Cloud Snapshot to continue at this exact moment.'}`,failed.length>0);
  } catch(e) {info('Backup failed: '+e.message,true);}
+ finally {setBusy(false);}
 }
-async function restoreCloud() {
+async function restoreSnapshot() {
+ if (cloudOperationBusy) return;
  try {
-  if (!emulatorStarted) throw Error('Start the game first.');
-  if (!confirm('Restore your cloud save for '+selected.name+'? This replaces the current in-game progress on this device. Export your local save first if you want a backup.')) return;
-  info('Downloading cloud save…');
-  const token=await validToken();
-  const res=await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${savePath()}`,{
-   headers:headers(token),cache:'no-store'
-  });
-  if (!res.ok) throw Error(res.status===404?'No cloud save exists for this game.':await parseError(res));
-  const bytes=new Uint8Array(await res.arrayBuffer());
-  if (bytes.byteLength<128) throw Error('Cloud save is empty or invalid.');
-  const manager=window.EJS_emulator.gameManager;
-  const path=manager.getSaveFilePath();
-  if (!path) throw Error('The emulator has not initialized its save path.');
-  const dirs=path.split('/');let dir='';
-  for (const part of dirs.slice(0,-1)) {if (!part) continue;dir+='/'+part;if (!manager.FS.analyzePath(dir).exists) manager.FS.mkdir(dir);}
-  manager.FS.writeFile(path,bytes);
-  await new Promise((resolve,reject)=>manager.FS.syncfs(false,e=>e?reject(e):resolve()));
-  manager.loadSaveFiles();
-  syncEnabled=true;cloudPresent=true;lastUploadedDigest=await digest(bytes);
-  info('Cloud save restored! Restarting the game so it loads the restored save…');
-  manager.restart();
- } catch(e) {info('Restore failed: '+e.message,true);}
+  const manager=getManager();
+  if (!confirm('Resume cloud snapshot for '+selected.name+'? This will replace the currently running game state. Save/export progress you want to keep first.')) return;
+  setBusy(true);syncEnabled=false;
+  info('Downloading instant snapshot from your account…');
+  const state=await fetchCloudFile('state');
+  // This resumes the emulated CPU/RAM, not just the battery save file.
+  manager.loadState(state);
+  cloudStatePresent=true;cloudPresent=true;
+  info('✅ Cloud snapshot loaded! You should now be at the exact moment you backed up. Save inside Pokémon before exiting.');
+ } catch(e) {info('Cloud snapshot restore failed: '+e.message,true);}
+ finally {setBusy(false);}
+}
+async function installSave(bytes,manager=getManager()) {
+ const path=manager.getSaveFilePath();
+ if (!path) throw Error('Emulator has not initialized the save file path.');
+ const parts=path.split('/');let dir='';
+ for (const part of parts.slice(0,-1)) {if (!part) continue;dir+='/'+part;if (!manager.FS.analyzePath(dir).exists) manager.FS.mkdir(dir);}
+ // Preserve any previous local file, including if the wrong cloud file was selected.
+ const exists=manager.FS.analyzePath(path).exists;
+ if (exists) {
+  const old=manager.FS.readFile(path);
+  manager.FS.writeFile(path+'.pre-cloud-backup',old);
+ }
+ manager.FS.writeFile(path,bytes);
+ await new Promise((resolve,reject)=>manager.FS.syncfs(false,e=>e?reject(e):resolve()));
+ manager.loadSaveFiles();
+ manager.restart();
+}
+async function restoreCloudSave() {
+ if (cloudOperationBusy) return;
+ try {
+  const manager=getManager();
+  if (!confirm('Restore the normal Pokémon save for '+selected.name+'? The game will restart at its title screen. Select Continue to load your save. Export any different local progress first.')) return;
+  setBusy(true);syncEnabled=false;
+  info('Downloading your cloud in-game save…');
+  const bytes=await fetchCloudFile('sav');
+  await installSave(bytes,manager);
+  lastUploadedDigest=await digest(bytes);cloudSavPresent=true;cloudPresent=true;syncEnabled=true;
+  info('✅ Cloud game save restored. Pokémon will show its title screen; select Continue to resume your last in-game save.');
+ } catch(e) {info('Cloud game save restore failed: '+e.message,true);}
+ finally {setBusy(false);}
+}
+async function importLocalSave(file) {
+ if (!file || cloudOperationBusy) return;
+ try {
+  const manager=getManager();
+  if (!confirm('Import '+file.name+' as '+selected.name+' save? This replaces the current local game save, not your cloud backup.')) return;
+  setBusy(true);syncEnabled=false;
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  if (bytes.byteLength<128) throw Error('The selected file is empty or too small.');
+  await installSave(bytes,manager);
+  info('Old save imported locally. Select Continue from the Pokémon title screen; once your progress is visible, tap Backup Now.');
+ } catch(e) {info('Import failed: '+e.message,true);}
+ finally {setBusy(false);$('import-sav-file').value='';}
 }
 function exportLocal() {
  try {
@@ -247,7 +332,7 @@ async function onSaveEvent(bytes) {
  try {
   const hash=await digest(copy);
   if (hash!==lastUploadedDigest) {
-   await uploadSave(copy,true);
+   await uploadObject('sav',copy,false);
    lastUploadedDigest=hash;
    info('☁️ '+selected.name+' automatically backed up ('+new Date().toLocaleTimeString()+').');
   }
@@ -284,7 +369,7 @@ async function startPlayer() {
   window.EJS_onGameStart=()=>{
    emulatorStarted=true;status.textContent='';
    if (chosenMode==='account') {
-    ['backup-btn','restore-btn','export-btn'].forEach(id=>$(id).disabled=false);
+    ['backup-btn','restore-btn','restore-sav-btn','export-btn','import-btn'].forEach(id=>$(id).disabled=false);
     const manager=window.EJS_emulator?.gameManager;
     if (manager) {
      window.EJS_emulator.on('saveSaveFiles', onSaveEvent);
@@ -305,7 +390,10 @@ $('register-btn').addEventListener('click',()=>void login(true));
 $('guest-btn').addEventListener('click',()=>void launch('guest'));
 $('login-form').addEventListener('submit',e=>{e.preventDefault();void login(false);});
 $('backup-btn').addEventListener('click',()=>void backupNow());
-$('restore-btn').addEventListener('click',()=>void restoreCloud());
+$('restore-btn').addEventListener('click',()=>void restoreSnapshot());
+$('restore-sav-btn').addEventListener('click',()=>void restoreCloudSave());
+$('import-btn').addEventListener('click',()=>$('import-sav-file').click());
+$('import-sav-file').addEventListener('change',e=>void importLocalSave(e.target.files?.[0]));
 $('export-btn').addEventListener('click',exportLocal);
 $('logout-btn').addEventListener('click',async()=>{
  if (!confirm('Log out? Save inside the game and back up your latest progress first.')) return;
