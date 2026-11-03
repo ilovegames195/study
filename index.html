@@ -2,14 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Radical Red Player</title>
+<title>Pokémon GBA Player</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#10131c;color:#eff2ff;font:16px system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:24px}h1{font-size:clamp(24px,5vw,38px);margin:8px 0}header p{color:#b3bed5}.tag{font-size:12px;color:#ff8790;letter-spacing:2px}#screen{height:min(70vh,640px);min-height:320px;background:#000;border:1px solid #35405c;border-radius:12px;overflow:hidden;margin:24px 0}#game{width:100%;height:100%}.note{line-height:1.6;color:#b3bed5;font-size:14px}#error{color:#ffc6cb}a{color:#9fb9ff}
 
 .controls{background:#191f2e;border:1px solid #35405c;border-radius:12px;padding:20px;margin:20px 0}.controls h2{margin:0 0 16px;font-size:21px}.controls table{width:100%;border-collapse:collapse}.controls th,.controls td{text-align:left;padding:12px 8px;border-bottom:1px solid #30394f}.controls th{color:#b3bed5;font-size:13px}kbd{display:inline-block;background:#29334a;border:1px solid #52617e;border-bottom-width:3px;border-radius:6px;padding:4px 10px;font:600 14px system-ui;color:#fff}.controls p{margin-bottom:0}
+.games{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.games a{padding:12px 18px;border:1px solid #52617e;border-radius:9px;text-decoration:none;color:#eff2ff;background:#20283b}.games a[aria-current="page"]{background:#9b3047;border-color:#ff8790}.games a:focus-visible{outline:3px solid #fff;outline-offset:3px}
 </style>
 </head>
-<body><main><header><span class="tag">GBA • BROWSER PLAYER</span><h1>Radical Red</h1><p>Press Start Game to play. Use the emulator menu to view or change controls.</p></header>
+<body><main><header><span class="tag">GBA • BROWSER PLAYER</span><h1 id="game-title">Radical Red</h1><p>Press Start Game to play. Use the emulator menu to view or change controls.</p></header>
+<nav aria-label="Choose a game" class="games">
+<a id="radical-link" href="?game=radical-red">Pokémon Radical Red</a>
+<a id="unbound-link" href="?game=unbound">Pokémon Unbound</a>
+</nav>
+<p class="note">Save in-game before switching games. Each game has separate progress.</p>
 <div id="screen"><div id="game"></div></div>
 <p id="error" role="alert"></p>
 <section class="controls" aria-labelledby="controls-title"><h2 id="controls-title">Keyboard controls</h2><table><thead><tr><th scope="col">Action</th><th scope="col">Key</th></tr></thead><tbody><tr><td>Move</td><td><kbd>↑ ↓ ← →</kbd></td></tr><tr><td>A — confirm / interact</td><td><kbd>Z</kbd></td></tr><tr><td>B — back / cancel</td><td><kbd>X</kbd></td></tr><tr><td>Start — game menu</td><td><kbd>Enter</kbd></td></tr><tr><td>Select</td><td><kbd>V</kbd></td></tr><tr><td>L</td><td><kbd>Q</kbd></td></tr><tr><td>R</td><td><kbd>E</kbd></td></tr></tbody></table><p class="note">Click inside the game before using the keyboard. These are the standard bindings; if you have changed them, open the emulator’s Controls settings to see your current keys.</p></section>
@@ -19,8 +25,19 @@
 <script>
 window.EJS_player = '#game';
 window.EJS_core = 'gba';
-window.EJS_gameName = 'Radical Red';
-window.EJS_gameUrl = './game.zip';
+const isUnbound = new URLSearchParams(window.location.search).get('game') === 'unbound';
+window.EJS_gameName = isUnbound ? 'Pokemon Unbound' : 'Radical Red';
+window.EJS_gameUrl = isUnbound ? './unbound.zip' : './game.zip';
+// Radical Red retains its original default game ID and ROM path.
+if (isUnbound) window.EJS_gameID = 2;
+document.getElementById('game-title').textContent = isUnbound ? 'Pokémon Unbound' : 'Radical Red';
+document.title = (isUnbound ? 'Pokémon Unbound' : 'Radical Red') + ' Player';
+document.getElementById(isUnbound ? 'unbound-link' : 'radical-link').setAttribute('aria-current', 'page');
+for (const link of document.querySelectorAll('.games a')) {
+  link.addEventListener('click', event => {
+    if (!window.confirm('Have you saved in-game? Switching games closes the current game.')) event.preventDefault();
+  });
+}
 window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 window.EJS_color = '#d94d62';
 window.EJS_startOnLoaded = false;
