@@ -27,7 +27,9 @@ window.EJS_player = '#game';
 window.EJS_core = selected.core;
 window.EJS_gameName = selected.name;
 if (selected.id) window.EJS_gameID = selected.id;
-window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+// Load the emulator from this GitHub Pages site, not the blocked CDN.
+// The complete EmulatorJS `data/` directory must exist alongside index.html.
+window.EJS_pathtodata = './data/';
 window.EJS_color = '#d94d62';
 window.EJS_startOnLoaded = false;
 window.EJS_volume = 0.5;
@@ -55,9 +57,13 @@ async function startPlayer() {
    status.textContent='Game downloaded. Loading the DS emulator…';
   } else window.EJS_gameUrl=selected.url;
   window.EJS_onGameStart=()=>{status.textContent='';};
+  status.textContent = 'Loading emulator from this website…';
   const loader=document.createElement('script');
   loader.src=window.EJS_pathtodata+'loader.js';
-  loader.onerror=()=>{document.getElementById('error').textContent='The emulator could not load. Check whether cdn.emulatorjs.org is accessible.';};
+  loader.onerror=()=>{
+   status.textContent = '';
+   document.getElementById('error').textContent = 'The emulator files have not loaded. Upload the complete EmulatorJS data folder to your GitHub repository (next to index.html), including data/loader.js, then refresh. This site no longer uses the blocked CDN.';
+  };
   document.body.appendChild(loader);
  } catch(error) {status.textContent='';document.getElementById('error').textContent=error.message+' Reload the page to retry.';}
 }
