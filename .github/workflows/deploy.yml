@@ -1,0 +1,83 @@
+
+name: Deploy Pokemon Emulator
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out website and game files
+        uses: actions/checkout@v4
+
+      - name: Copy website files
+        run: |
+          mkdir -p _site
+          rsync -a --exclude='.git/' --exclude='.github/' --exclude='_site/' --exclude='pokemon_emulator_ready.zip' ./ _site/
+
+      - name: Download EmulatorJS 4.2.3
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://cdn.emulatorjs.org/releases/4.2.3.7z' \
+            --output /tmp/emulatorjs.7z
+          mkdir -p /tmp/emulatorjs-unpacked
+          7z x -y -o/tmp/emulatorjs-unpacked /tmp/emulatorjs.7z >/dev/null
+          DATA_DIR="$(find /tmp/emulatorjs-unpacked -type f -path '*/data/loader.js' -print -quit)"
+          test -n "$DATA_DIR" || exit 1
+          DATA_DIR="$(dirname "$DATA_DIR")"
+          mkdir -p _site/data
+          cp -a "$DATA_DIR"/. _site/data/
+          find _site/data/cores -type f -name '*.data' \
+            ! -name 'mgba*.data' \
+            ! -name 'gambatte*.data' \
+            ! -name 'desmume*.data' -delete
+          test -f _site/data/loader.js
+          test -f _site/data/cores/mgba-wasm.data
+          test -f _site/data/cores/gambatte-wasm.data
+          test -f _site/data/cores/desmume-wasm.data
+
+      - name: Use local emulator files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          page = Path('_site/index.html')
+          html = page.read_text(encoding='utf-8')
+          html = html.replace('https://cdn.emulatorjs.org/stable/data/', './data/')
+          html = html.replace('https://cdn.emulatorjs.org/4.2.3/data/', './data/')
+          html = html.replace('The emulator could not load. Check whether cdn.emulatorjs.org is accessible.', 'The emulator could not load from this website.')
+          page.write_text(html, encoding='utf-8')
+          PY
+          touch _site/.nojekyll
+
+      - name: Set up GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Package website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish website
+        id: deployment
+        uses: actions/deploy-pages@v4
