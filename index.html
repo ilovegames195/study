@@ -189,8 +189,11 @@ async function digest(bytes) {
  const result=await crypto.subtle.digest('SHA-256',bytes);
  return [...new Uint8Array(result)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
+// Bypass the browser/CDN copy when checking freshly overwritten cloud files.
+// Supabase warns that Storage upserts can take time to propagate through caches.
 async function fetchCloudFile(ext) {
- const res=await fetch(objectUrl(ext),{headers:headers(await validToken()),cache:'no-store'});
+ const freshUrl=objectUrl(ext)+'?cacheNonce='+encodeURIComponent(Date.now()+'-'+Math.random().toString(36).slice(2));
+ const res=await fetch(freshUrl,{headers:headers(await validToken()),cache:'no-store'});
  if (!res.ok) throw Error(res.status===404?`There is no cloud ${ext==='state'?'snapshot':'game save'} for ${selected.name}.`:await parseError(res));
  const data=new Uint8Array(await res.arrayBuffer());
  if (data.byteLength<128) throw Error('The cloud '+ext+' file is empty or invalid.');
@@ -205,9 +208,23 @@ async function uploadObject(ext,bytes,verify=false) {
  });
  if (!res.ok) throw Error(await parseError(res));
  if (verify) {
-  const downloaded=await fetchCloudFile(ext);
-  if (downloaded.byteLength!==bytes.byteLength || (await digest(downloaded))!==(await digest(bytes))) {
-   throw Error('Cloud '+ext+' verification failed. Keep your local save; do not delete it.');
+  const expectedHash=await digest(bytes);
+  let verified=false, lastDetail='';
+  // Immediately reading a replaced object can still return a stale copy.
+  // Retry with a new cache-busting URL before calling it a failure.
+  for (let attempt=0;attempt<4;attempt++) {
+   if (attempt) await new Promise(resolve=>setTimeout(resolve,[0,800,1600,3000][attempt]));
+   try {
+    const downloaded=await fetchCloudFile(ext);
+    const actualHash=await digest(downloaded);
+    if (downloaded.byteLength===bytes.byteLength && actualHash===expectedHash) {
+     verified=true;break;
+    }
+    lastDetail='The downloaded version did not match the new upload (may still be cached).';
+   } catch(e) {lastDetail=e.message;}
+  }
+  if (!verified) {
+   throw Error('Cloud '+ext+' verification could not be confirmed after retries. '+lastDetail+' Keep your local save; do not delete it.');
   }
  }
  if (ext==='sav') cloudSavPresent=true;
@@ -229,10 +246,16 @@ async function backupNow() {
   const manager=getManager();
   if (cloudPresent && !confirm('Overwrite the existing cloud backup for '+selected.name+' with this device’s current progress? Make sure the game shows your actual saved progress first.')) return;
   setBusy(true);
-  // Disable auto-upload during manual backup so it cannot race with these writes.
+  // Disable new automatic uploads and wait for one already in flight.
   const wasSyncEnabled=syncEnabled;syncEnabled=false;
+  if (uploadBusy) {
+   info('Waiting for the previous automatic cloud upload to finish…');
+   for (let i=0;i<80&&uploadBusy;i++) await new Promise(resolve=>setTimeout(resolve,250));
+   if (uploadBusy) throw Error('Another upload is still running. Retry when it finishes.');
+  }
   info('Collecting current game save and instant snapshot…');
-  const sav=manager.getSaveFile(true);
+  const rawSav=manager.getSaveFile(true);
+  const sav=rawSav?new Uint8Array(rawSav):null;
   let state=null, stateError=null;
   try {state=manager.getState();} catch(e) {stateError=e;}
   if ((!sav||sav.byteLength<128) && (!state||state.byteLength<128)) {
