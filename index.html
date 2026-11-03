@@ -8,65 +8,311 @@
 
 .controls{background:#191f2e;border:1px solid #35405c;border-radius:12px;padding:20px;margin:20px 0}.controls h2{margin:0 0 16px;font-size:21px}.controls table{width:100%;border-collapse:collapse}.controls th,.controls td{text-align:left;padding:12px 8px;border-bottom:1px solid #30394f}.controls th{color:#b3bed5;font-size:13px}kbd{display:inline-block;background:#29334a;border:1px solid #52617e;border-bottom-width:3px;border-radius:6px;padding:4px 10px;font:600 14px system-ui;color:#fff}.controls p{margin-bottom:0}
 .games{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.games a{padding:12px 18px;border:1px solid #52617e;border-radius:9px;text-decoration:none;color:#eff2ff;background:#20283b}.games a[aria-current="page"]{background:#9b3047;border-color:#ff8790}.games a:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+.cloud-panel{background:#191f2e;border:1px solid #35405c;border-radius:12px;padding:20px;margin:20px 0}
+.cloud-panel h2{margin:0 0 10px;font-size:21px}.auth-fields{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:16px 0}
+.auth-fields label{display:grid;gap:6px;font-size:14px;flex:1;min-width:160px}.auth-fields input{background:#10131c;border:1px solid #52617e;color:white;border-radius:8px;padding:12px;font-size:16px;width:100%}
+.cloud-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.cloud-actions button{background:#d94d62;color:white;border:0;padding:11px 15px;border-radius:8px;cursor:pointer;font-weight:650}.cloud-actions button.secondary{background:#29334a;border:1px solid #52617e}.cloud-actions button:disabled{opacity:.5;cursor:not-allowed}
+#cloud-message{font-size:14px;min-height:1.4em;color:#b3bed5;overflow-wrap:anywhere}#cloud-message.problem{color:#ffc6cb}
+#cloud-identity{font-weight:700;color:#aff9c9}
 </style>
 </head>
 <body><main><header><span class="tag">POKÉMON • BROWSER PLAYER</span><h1 id="game-title">Radical Red</h1><p>Press Start Game to play. Use the emulator menu to view or change controls.</p></header>
 <nav aria-label="Choose a game" class="games"><a data-game="radical-red" href="?game=radical-red">Radical Red</a><a data-game="unbound" href="?game=unbound">Pokemon Unbound</a><a data-game="inclement-emerald" href="?game=inclement-emerald">Inclement Emerald</a><a data-game="prism" href="?game=prism">Pokemon Prism</a><a data-game="renegade-platinum" href="?game=renegade-platinum">Renegade Platinum</a><a data-game="gaia" href="?game=gaia">Pokemon Gaia</a></nav>
 <p class="note">Save in-game before switching games. Each game has separate progress.</p>
+<section class="cloud-panel" aria-label="Pokémon cloud saves">
+<h2>☁️ Pokémon Cloud Saves</h2>
+<div id="auth-signin">
+<p class="note">Use a username and password to save progress across devices. No email needed to use the login screen.</p>
+<form id="login-form" class="auth-fields">
+<label>Username<input id="username" type="text" autocomplete="username" inputmode="text" minlength="3" maxlength="18" pattern="[a-zA-Z0-9_]+" required placeholder="Your username"></label>
+<label>Password<input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="8+ characters"></label>
+</form>
+<div class="cloud-actions"><button id="login-btn" type="button">Log In</button><button id="register-btn" type="button" class="secondary">Create Account</button><button id="guest-btn" type="button" class="secondary">Continue Local (Guest)</button></div>
+<p class="note">Username-only accounts cannot reset forgotten passwords by email. Use a unique password and keep a secure backup.</p>
+</div>
+<div id="auth-active" hidden>
+<p>Playing as <span id="cloud-identity"></span></p>
+<p class="note">Save inside the Pokémon game first. Backup Now sends your current game save to your private Supabase account. Restore downloads your cloud save onto this device.</p>
+<div class="cloud-actions"><button id="backup-btn" type="button" disabled>Backup Now</button><button id="restore-btn" type="button" class="secondary" disabled>Restore Cloud Save</button><button id="export-btn" type="button" class="secondary" disabled>Export Local Save</button><button id="logout-btn" type="button" class="secondary">Log Out</button></div>
+</div>
+<p id="cloud-message" role="status"></p>
+</section>
 <div id="screen"><div id="game"></div></div>
 <p id="status" role="status"></p><p id="error" role="alert"></p>
 <section class="controls" aria-labelledby="controls-title"><h2 id="controls-title">Keyboard controls</h2><table><thead><tr><th scope="col">Action</th><th scope="col">Key</th></tr></thead><tbody><tr><td>Move</td><td><kbd>↑ ↓ ← →</kbd></td></tr><tr><td>A — confirm / interact</td><td><kbd>Z</kbd></td></tr><tr><td>B — back / cancel</td><td><kbd>X</kbd></td></tr><tr><td>Start — game menu</td><td><kbd>Enter</kbd></td></tr><tr><td>Select</td><td><kbd>V</kbd></td></tr><tr><td>L</td><td><kbd>Q</kbd></td></tr><tr><td>R</td><td><kbd>E</kbd></td></tr><tr class="ds-only" hidden><td>DS X — menu</td><td><kbd>A</kbd></td></tr><tr class="ds-only" hidden><td>DS Y</td><td><kbd>S</kbd></td></tr><tr class="ds-only" hidden><td>DS touchscreen</td><td>Click / tap the bottom screen</td></tr></tbody></table><p class="note">Click inside the game before using the keyboard. These are the standard bindings; if you have changed them, open the emulator’s Controls settings to see your current keys.</p></section>
-<p class="note">Save using the game's Save menu. Browser saves stay on this browser and device; they do not sync between computers. Clearing site data can erase progress. Use the emulator's save export tools for a backup when downloads are available.</p>
+<p class="note">Save using the game's Save menu. Guest saves remain on this browser and device. Signed-in cloud backups are stored privately for your account. Always keep exported backup saves. Clearing your browser data can delete unsynced progress.</p>
 <p class="note">Powered by <a href="https://emulatorjs.org/">EmulatorJS</a> and mGBA.</p>
 </main>
 <script>
-const games = [{"slug": "radical-red", "name": "Radical Red", "core": "gba", "url": "./game.zip"}, {"slug": "unbound", "name": "Pokemon Unbound", "core": "gba", "url": "./unbound.zip", "id": 2}, {"slug": "inclement-emerald", "name": "Inclement Emerald", "core": "gba", "url": "./inclement-emerald.zip", "id": 3}, {"slug": "prism", "name": "Pokemon Prism", "core": "gambatte", "url": "./prism.zip", "id": 4}, {"slug": "renegade-platinum", "name": "Renegade Platinum", "core": "desmume", "parts": ["./renegade-platinum.part1", "./renegade-platinum.part2", "./renegade-platinum.part3"], "id": 5}, {"slug": "gaia", "name": "Pokemon Gaia", "core": "gba", "url": "./gaia.zip", "id": 6}];
-const requested = new URLSearchParams(window.location.search).get('game');
+// Supabase credentials supplied by the owner. This is a PUBLIC publishable key, not a secret.
+const SUPABASE_URL = 'https://cjohyxmdfihywigdxhza.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable__QFyr-v6eymj2fML_Yu6hQ_lmzc0wjV';
+const BUCKET = 'pokemon-saves';
+const SESSION_KEY = 'pokemon-cloud-session-v1';
+// Compatibility shim for Supabase email/password Auth. No messages are sent to these
+// internal identifiers, and no password recovery is available. For small private-use only.
+const ALIAS_DOMAIN = 'cjohyxmdfihywigdxhza.supabase.co';
+const games = [{"slug":"radical-red","name":"Radical Red","core":"gba","url":"./game.zip"},{"slug":"unbound","name":"Pokemon Unbound","core":"gba","url":"./unbound.zip","id":2},{"slug":"inclement-emerald","name":"Inclement Emerald","core":"gba","url":"./inclement-emerald.zip","id":3},{"slug":"prism","name":"Pokemon Prism","core":"gambatte","url":"./prism.zip","id":4},{"slug":"renegade-platinum","name":"Renegade Platinum","core":"desmume","parts":["./renegade-platinum.part1","./renegade-platinum.part2","./renegade-platinum.part3"],"id":5},{"slug":"gaia","name":"Pokemon Gaia","core":"gba","url":"./gaia.zip","id":6}];
+const requested = new URLSearchParams(location.search).get('game');
 const selected = games.find(g => g.slug === requested) || games[0];
-window.EJS_player = '#game';
-window.EJS_core = selected.core;
-window.EJS_gameName = selected.name;
-if (selected.id) window.EJS_gameID = selected.id;
-// Load the emulator from this GitHub Pages site, not the blocked CDN.
-// The complete EmulatorJS `data/` directory must exist alongside index.html.
-window.EJS_pathtodata = './data/';
-window.EJS_color = '#d94d62';
-window.EJS_startOnLoaded = false;
-window.EJS_volume = 0.5;
+const $ = id => document.getElementById(id);
+let session = null, chosenMode = '', emulatorStarted = false, cloudPresent = false;
+let syncEnabled = false, syncTimer = null, uploadBusy = false, pendingBytes = null, lastUploadedDigest = '';
+let loadingStarted = false;
+
 document.title = selected.name + ' Player';
-document.getElementById('game-title').textContent = selected.name;
+$('game-title').textContent = selected.name;
 for (const row of document.querySelectorAll('.ds-only')) row.hidden = selected.core !== 'desmume';
 for (const link of document.querySelectorAll('.games a')) {
  if (link.dataset.game === selected.slug) link.setAttribute('aria-current','page');
  link.addEventListener('click', e => {
-  if (!window.confirm('Have you saved in-game? Switching closes the current game.')) e.preventDefault();
+  if (emulatorStarted && !confirm('Have you saved in-game and backed up any new progress? Switching closes this game.')) e.preventDefault();
  });
 }
-async function startPlayer() {
- const status = document.getElementById('status');
+function info(message, isError=false) {
+ $('cloud-message').textContent = message;
+ $('cloud-message').classList.toggle('problem',isError);
+}
+function ensureUsername() {
+ const username = $('username').value.trim().toLowerCase();
+ if (!/^[a-z0-9_]{3,18}$/.test(username)) throw Error('Username must contain 3–18 letters, numbers or underscores.');
+ return username;
+}
+function fakeEmail(username) { return username + '@' + ALIAS_DOMAIN; }
+function headers(token, contentType) {
+ const h = {'apikey': SUPABASE_PUBLISHABLE_KEY};
+ if (token) h.Authorization = 'Bearer ' + token;
+ if (contentType) h['Content-Type'] = contentType;
+ return h;
+}
+async function parseError(res) {
+ let response;
+ try { response = await res.json(); } catch { response = null; }
+ return response?.msg || response?.message || response?.error_description || response?.error || `HTTP ${res.status}`;
+}
+async function apiJson(path, method='GET', body=null, token=null) {
+ const res = await fetch(SUPABASE_URL + path, {
+  method, headers:headers(token, body ? 'application/json' : undefined),
+  body:body ? JSON.stringify(body) : undefined
+ });
+ if (!res.ok) throw Error(await parseError(res));
+ return res.json();
+}
+function persistSession(payload, username) {
+ session = {access_token:payload.access_token,refresh_token:payload.refresh_token,
+  expires_at:Date.now()+Math.max(1,payload.expires_in || 3600)*1000,
+  user_id:payload.user?.id || session?.user_id, username:username || session?.username};
+ localStorage.setItem(SESSION_KEY,JSON.stringify(session));
+}
+async function validToken() {
+ if (!session) throw Error('Log in first.');
+ if (session.expires_at - Date.now() < 60000) {
+  const username = session.username;
+  const data = await apiJson('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token});
+  persistSession(data,username);
+ }
+ return session.access_token;
+}
+async function login(isRegistration) {
+ if (loadingStarted) { info('Reload this page to change accounts.'); return; }
  try {
+  const username = ensureUsername();
+  const password = $('password').value;
+  if (password.length < 8) throw Error('Use a password of at least 8 characters.');
+  $('login-btn').disabled = $('register-btn').disabled = true;
+  info(isRegistration?'Creating your account…':'Signing in…');
+  const email = fakeEmail(username);
+  const payload = isRegistration
+   ? await apiJson('/auth/v1/signup','POST',{email,password,data:{username}})
+   : await apiJson('/auth/v1/token?grant_type=password','POST',{email,password});
+  if (!payload.access_token || !payload.user?.id) throw Error('Account created but not signed in. In Supabase → Authentication → Providers → Email, turn OFF Confirm email, then try logging in.');
+  persistSession(payload,username);
+  $('password').value = '';
+  await launch('account');
+ } catch (e) { info('Login error: ' + e.message,true); }
+ finally { $('login-btn').disabled = $('register-btn').disabled = false; }
+}
+async function resumeSession() {
+ try {
+  const saved=localStorage.getItem(SESSION_KEY);
+  if (!saved) return;
+  session=JSON.parse(saved);
+  const token=await validToken();
+  const me=await apiJson('/auth/v1/user','GET',null,token);
+  if (!me.id || me.id!==session.user_id) throw Error('Session expired');
+  await launch('account');
+ } catch(e) {
+  session=null; localStorage.removeItem(SESSION_KEY);
+  info('Your session expired. Please log in again.');
+ }
+}
+function changeIdentity(mode) {
+ $('auth-signin').hidden = true;
+ $('auth-active').hidden = mode !== 'account';
+ $('cloud-identity').textContent = session?.username || '';
+}
+async function launch(mode) {
+ if (loadingStarted) return;
+ loadingStarted = true; chosenMode = mode;
+ changeIdentity(mode);
+ info(mode==='guest' ? 'Local guest mode: old browser saves are still available.' : 'Checking your private cloud save…');
+ if (mode==='account') await checkCloudStatus();
+ await startPlayer();
+}
+function savePath() { return `${session.user_id}/${selected.slug}.sav`; }
+async function checkCloudStatus() {
+ try {
+  const r=await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${savePath()}`, {
+   headers:headers(await validToken()), cache:'no-store'
+  });
+  if (r.status===404 || r.status===400) {cloudPresent=false;syncEnabled=true;info('No cloud save found for this game yet. Automatic backup is enabled.');return;}
+  if (!r.ok) throw Error(await parseError(r));
+  cloudPresent=true;syncEnabled=false;
+  info('Cloud save found. Use Restore Cloud Save, or Backup Now to replace it with progress from this device. Automatic uploads are paused to avoid overwriting it.');
+ } catch(e) { syncEnabled=false;info('Could not check cloud storage: '+e.message+'. Auto backup is paused.',true); }
+}
+async function digest(bytes) {
+ const result=await crypto.subtle.digest('SHA-256',bytes);
+ return [...new Uint8Array(result)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function uploadSave(bytes, quiet=false) {
+ if (chosenMode!=='account' || !session) throw Error('Log in first.');
+ if (!bytes || bytes.byteLength<128) throw Error('There is no usable in-game save yet. Save from the Pokémon game menu first.');
+ const token=await validToken();
+ const res=await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${savePath()}`, {
+  method:'POST',headers:{...headers(token,'application/octet-stream'),'x-upsert':'true','cache-control':'no-cache'},
+  body:new Blob([bytes],{type:'application/octet-stream'})
+ });
+ if (!res.ok) throw Error(await parseError(res));
+ cloudPresent=true;
+ if (!quiet) info('Cloud backup successful! Your '+selected.name+' save is stored in your account.');
+}
+function getLocalSave() {
+ if (!emulatorStarted || !window.EJS_emulator?.gameManager) throw Error('Start the game first.');
+ return window.EJS_emulator.gameManager.getSaveFile(true);
+}
+async function backupNow() {
+ try {
+  const save=getLocalSave();
+  if (!save || save.byteLength<128) throw Error('No in-game save found. Use the game’s Save option first.');
+  if (cloudPresent && !confirm('Replace your existing cloud save for '+selected.name+' with this device’s current save?')) return;
+  info('Uploading your save…');
+  await uploadSave(save);
+  lastUploadedDigest=await digest(save);
+  syncEnabled=true;
+ } catch(e) {info('Backup failed: '+e.message,true);}
+}
+async function restoreCloud() {
+ try {
+  if (!emulatorStarted) throw Error('Start the game first.');
+  if (!confirm('Restore your cloud save for '+selected.name+'? This replaces the current in-game progress on this device. Export your local save first if you want a backup.')) return;
+  info('Downloading cloud save…');
+  const token=await validToken();
+  const res=await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${savePath()}`,{
+   headers:headers(token),cache:'no-store'
+  });
+  if (!res.ok) throw Error(res.status===404?'No cloud save exists for this game.':await parseError(res));
+  const bytes=new Uint8Array(await res.arrayBuffer());
+  if (bytes.byteLength<128) throw Error('Cloud save is empty or invalid.');
+  const manager=window.EJS_emulator.gameManager;
+  const path=manager.getSaveFilePath();
+  if (!path) throw Error('The emulator has not initialized its save path.');
+  const dirs=path.split('/');let dir='';
+  for (const part of dirs.slice(0,-1)) {if (!part) continue;dir+='/'+part;if (!manager.FS.analyzePath(dir).exists) manager.FS.mkdir(dir);}
+  manager.FS.writeFile(path,bytes);
+  await new Promise((resolve,reject)=>manager.FS.syncfs(false,e=>e?reject(e):resolve()));
+  manager.loadSaveFiles();
+  syncEnabled=true;cloudPresent=true;lastUploadedDigest=await digest(bytes);
+  info('Cloud save restored! Restarting the game so it loads the restored save…');
+  manager.restart();
+ } catch(e) {info('Restore failed: '+e.message,true);}
+}
+function exportLocal() {
+ try {
+  const bytes=getLocalSave();
+  if (!bytes || bytes.byteLength<128) throw Error('Save inside the Pokémon game first.');
+  const blob=new Blob([bytes],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=selected.slug+'.sav';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  info('Local save exported. Keep this file somewhere safe.');
+ } catch(e) {info('Export failed: '+e.message,true);}
+}
+async function onSaveEvent(bytes) {
+ if (chosenMode!=='account' || !syncEnabled || !bytes || bytes.byteLength<128) return;
+ const copy=new Uint8Array(bytes); // take an immutable snapshot of the emulator buffer
+ if (uploadBusy) {pendingBytes=copy;return;}
+ uploadBusy=true;
+ try {
+  const hash=await digest(copy);
+  if (hash!==lastUploadedDigest) {
+   await uploadSave(copy,true);
+   lastUploadedDigest=hash;
+   info('☁️ '+selected.name+' automatically backed up ('+new Date().toLocaleTimeString()+').');
+  }
+ } catch(e) {syncEnabled=false;info('Automatic cloud backup failed: '+e.message+'. Use Backup Now to retry.',true);}
+ finally {
+  uploadBusy=false;
+  if (pendingBytes) {const pending=pendingBytes;pendingBytes=null;void onSaveEvent(pending);}
+ }
+}
+async function startPlayer() {
+ const status = $('status');
+ try {
+  window.EJS_player = '#game';
+  window.EJS_core = selected.core;
+  // Add the Auth user ID to EmulatorJS's local-save identifier to isolate accounts.
+  // Guest uses the ORIGINAL name so previous local saves remain reachable.
+  window.EJS_gameName = chosenMode==='account' ? `${selected.name} Account ${session.user_id}` : selected.name;
+  if (selected.id) window.EJS_gameID = selected.id;
+  window.EJS_pathtodata = './data/';
+  window.EJS_color = '#d94d62';
+  window.EJS_startOnLoaded = false;
+  window.EJS_volume = 0.5;
   if (selected.parts) {
    const pieces=[];
    for (let i=0;i<selected.parts.length;i++) {
     status.textContent = 'Loading Renegade Platinum: file ' + (i+1) + ' of ' + selected.parts.length + '…';
     const response=await fetch(selected.parts[i]);
-    if (!response.ok) throw new Error('Missing game file: '+ selected.parts[i] + ' (HTTP ' + response.status + ')');
+    if (!response.ok) throw Error('Missing game file: '+ selected.parts[i] + ' (HTTP ' + response.status + ')');
     pieces.push(await response.arrayBuffer());
    }
    window.EJS_gameUrl=URL.createObjectURL(new Blob(pieces,{type:'application/zip'}));
    status.textContent='Game downloaded. Loading the DS emulator…';
   } else window.EJS_gameUrl=selected.url;
-  window.EJS_onGameStart=()=>{status.textContent='';};
-  status.textContent = 'Loading emulator from this website…';
-  const loader=document.createElement('script');
-  loader.src=window.EJS_pathtodata+'loader.js';
-  loader.onerror=()=>{
-   status.textContent = '';
-   document.getElementById('error').textContent = 'The emulator files have not loaded. Upload the complete EmulatorJS data folder to your GitHub repository (next to index.html), including data/loader.js, then refresh. This site no longer uses the blocked CDN.';
+  window.EJS_onGameStart=()=>{
+   emulatorStarted=true;status.textContent='';
+   if (chosenMode==='account') {
+    ['backup-btn','restore-btn','export-btn'].forEach(id=>$(id).disabled=false);
+    const manager=window.EJS_emulator?.gameManager;
+    if (manager) {
+     window.EJS_emulator.on('saveSaveFiles', onSaveEvent);
+     syncTimer=setInterval(()=>{
+      try {if (emulatorStarted && chosenMode==='account') manager.saveSaveFiles();} catch(e) {console.warn('Periodic save flush failed',e);}
+     },45000);
+    }
+   }
   };
+  status.textContent = 'Loading local EmulatorJS files…';
+  const loader=document.createElement('script');loader.src='./data/loader.js';
+  loader.onerror=()=>{status.textContent='';$('error').textContent='Could not load data/loader.js. Check GitHub Actions deployment.';};
   document.body.appendChild(loader);
- } catch(error) {status.textContent='';document.getElementById('error').textContent=error.message+' Reload the page to retry.';}
+ } catch(e) {status.textContent='';$('error').textContent=e.message+' Reload to retry.';}
 }
-startPlayer();
+$('login-btn').addEventListener('click',()=>void login(false));
+$('register-btn').addEventListener('click',()=>void login(true));
+$('guest-btn').addEventListener('click',()=>void launch('guest'));
+$('login-form').addEventListener('submit',e=>{e.preventDefault();void login(false);});
+$('backup-btn').addEventListener('click',()=>void backupNow());
+$('restore-btn').addEventListener('click',()=>void restoreCloud());
+$('export-btn').addEventListener('click',exportLocal);
+$('logout-btn').addEventListener('click',async()=>{
+ if (!confirm('Log out? Save inside the game and back up your latest progress first.')) return;
+ try {await apiJson('/auth/v1/logout','POST',{},await validToken());} catch(e){console.warn('Remote logout failed',e);}
+ session=null;localStorage.removeItem(SESSION_KEY);location.reload();
+});
+window.addEventListener('beforeunload',()=>{if (syncTimer) clearInterval(syncTimer);});
+void resumeSession();
 </script>
 </body></html>
