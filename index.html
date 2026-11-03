@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pokémon GBA Player</title>
+<title>Pokémon Player</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#10131c;color:#eff2ff;font:16px system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:24px}h1{font-size:clamp(24px,5vw,38px);margin:8px 0}header p{color:#b3bed5}.tag{font-size:12px;color:#ff8790;letter-spacing:2px}#screen{height:min(70vh,640px);min-height:320px;background:#000;border:1px solid #35405c;border-radius:12px;overflow:hidden;margin:24px 0}#game{width:100%;height:100%}.note{line-height:1.6;color:#b3bed5;font-size:14px}#error{color:#ffc6cb}a{color:#9fb9ff}
 
@@ -10,38 +10,57 @@
 .games{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.games a{padding:12px 18px;border:1px solid #52617e;border-radius:9px;text-decoration:none;color:#eff2ff;background:#20283b}.games a[aria-current="page"]{background:#9b3047;border-color:#ff8790}.games a:focus-visible{outline:3px solid #fff;outline-offset:3px}
 </style>
 </head>
-<body><main><header><span class="tag">GBA • BROWSER PLAYER</span><h1 id="game-title">Radical Red</h1><p>Press Start Game to play. Use the emulator menu to view or change controls.</p></header>
-<nav aria-label="Choose a game" class="games">
-<a id="radical-link" href="?game=radical-red">Pokémon Radical Red</a>
-<a id="unbound-link" href="?game=unbound">Pokémon Unbound</a>
-</nav>
+<body><main><header><span class="tag">POKÉMON • BROWSER PLAYER</span><h1 id="game-title">Radical Red</h1><p>Press Start Game to play. Use the emulator menu to view or change controls.</p></header>
+<nav aria-label="Choose a game" class="games"><a data-game="radical-red" href="?game=radical-red">Radical Red</a><a data-game="unbound" href="?game=unbound">Pokemon Unbound</a><a data-game="inclement-emerald" href="?game=inclement-emerald">Inclement Emerald</a><a data-game="prism" href="?game=prism">Pokemon Prism</a><a data-game="renegade-platinum" href="?game=renegade-platinum">Renegade Platinum</a><a data-game="gaia" href="?game=gaia">Pokemon Gaia</a></nav>
 <p class="note">Save in-game before switching games. Each game has separate progress.</p>
 <div id="screen"><div id="game"></div></div>
-<p id="error" role="alert"></p>
-<section class="controls" aria-labelledby="controls-title"><h2 id="controls-title">Keyboard controls</h2><table><thead><tr><th scope="col">Action</th><th scope="col">Key</th></tr></thead><tbody><tr><td>Move</td><td><kbd>↑ ↓ ← →</kbd></td></tr><tr><td>A — confirm / interact</td><td><kbd>Z</kbd></td></tr><tr><td>B — back / cancel</td><td><kbd>X</kbd></td></tr><tr><td>Start — game menu</td><td><kbd>Enter</kbd></td></tr><tr><td>Select</td><td><kbd>V</kbd></td></tr><tr><td>L</td><td><kbd>Q</kbd></td></tr><tr><td>R</td><td><kbd>E</kbd></td></tr></tbody></table><p class="note">Click inside the game before using the keyboard. These are the standard bindings; if you have changed them, open the emulator’s Controls settings to see your current keys.</p></section>
+<p id="status" role="status"></p><p id="error" role="alert"></p>
+<section class="controls" aria-labelledby="controls-title"><h2 id="controls-title">Keyboard controls</h2><table><thead><tr><th scope="col">Action</th><th scope="col">Key</th></tr></thead><tbody><tr><td>Move</td><td><kbd>↑ ↓ ← →</kbd></td></tr><tr><td>A — confirm / interact</td><td><kbd>Z</kbd></td></tr><tr><td>B — back / cancel</td><td><kbd>X</kbd></td></tr><tr><td>Start — game menu</td><td><kbd>Enter</kbd></td></tr><tr><td>Select</td><td><kbd>V</kbd></td></tr><tr><td>L</td><td><kbd>Q</kbd></td></tr><tr><td>R</td><td><kbd>E</kbd></td></tr><tr class="ds-only" hidden><td>DS X — menu</td><td><kbd>A</kbd></td></tr><tr class="ds-only" hidden><td>DS Y</td><td><kbd>S</kbd></td></tr><tr class="ds-only" hidden><td>DS touchscreen</td><td>Click / tap the bottom screen</td></tr></tbody></table><p class="note">Click inside the game before using the keyboard. These are the standard bindings; if you have changed them, open the emulator’s Controls settings to see your current keys.</p></section>
 <p class="note">Save using the game's Save menu. Browser saves stay on this browser and device; they do not sync between computers. Clearing site data can erase progress. Use the emulator's save export tools for a backup when downloads are available.</p>
 <p class="note">Powered by <a href="https://emulatorjs.org/">EmulatorJS</a> and mGBA.</p>
 </main>
 <script>
+const games = [{"slug": "radical-red", "name": "Radical Red", "core": "gba", "url": "./game.zip"}, {"slug": "unbound", "name": "Pokemon Unbound", "core": "gba", "url": "./unbound.zip", "id": 2}, {"slug": "inclement-emerald", "name": "Inclement Emerald", "core": "gba", "url": "./inclement-emerald.zip", "id": 3}, {"slug": "prism", "name": "Pokemon Prism", "core": "gambatte", "url": "./prism.zip", "id": 4}, {"slug": "renegade-platinum", "name": "Renegade Platinum", "core": "desmume", "parts": ["./renegade-platinum.part1", "./renegade-platinum.part2", "./renegade-platinum.part3"], "id": 5}, {"slug": "gaia", "name": "Pokemon Gaia", "core": "gba", "url": "./gaia.zip", "id": 6}];
+const requested = new URLSearchParams(window.location.search).get('game');
+const selected = games.find(g => g.slug === requested) || games[0];
 window.EJS_player = '#game';
-window.EJS_core = 'gba';
-const isUnbound = new URLSearchParams(window.location.search).get('game') === 'unbound';
-window.EJS_gameName = isUnbound ? 'Pokemon Unbound' : 'Radical Red';
-window.EJS_gameUrl = isUnbound ? './unbound.zip' : './game.zip';
-// Radical Red retains its original default game ID and ROM path.
-if (isUnbound) window.EJS_gameID = 2;
-document.getElementById('game-title').textContent = isUnbound ? 'Pokémon Unbound' : 'Radical Red';
-document.title = (isUnbound ? 'Pokémon Unbound' : 'Radical Red') + ' Player';
-document.getElementById(isUnbound ? 'unbound-link' : 'radical-link').setAttribute('aria-current', 'page');
-for (const link of document.querySelectorAll('.games a')) {
-  link.addEventListener('click', event => {
-    if (!window.confirm('Have you saved in-game? Switching games closes the current game.')) event.preventDefault();
-  });
-}
+window.EJS_core = selected.core;
+window.EJS_gameName = selected.name;
+if (selected.id) window.EJS_gameID = selected.id;
 window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 window.EJS_color = '#d94d62';
 window.EJS_startOnLoaded = false;
 window.EJS_volume = 0.5;
+document.title = selected.name + ' Player';
+document.getElementById('game-title').textContent = selected.name;
+for (const row of document.querySelectorAll('.ds-only')) row.hidden = selected.core !== 'desmume';
+for (const link of document.querySelectorAll('.games a')) {
+ if (link.dataset.game === selected.slug) link.setAttribute('aria-current','page');
+ link.addEventListener('click', e => {
+  if (!window.confirm('Have you saved in-game? Switching closes the current game.')) e.preventDefault();
+ });
+}
+async function startPlayer() {
+ const status = document.getElementById('status');
+ try {
+  if (selected.parts) {
+   const pieces=[];
+   for (let i=0;i<selected.parts.length;i++) {
+    status.textContent = 'Loading Renegade Platinum: file ' + (i+1) + ' of ' + selected.parts.length + '…';
+    const response=await fetch(selected.parts[i]);
+    if (!response.ok) throw new Error('Missing game file: '+ selected.parts[i] + ' (HTTP ' + response.status + ')');
+    pieces.push(await response.arrayBuffer());
+   }
+   window.EJS_gameUrl=URL.createObjectURL(new Blob(pieces,{type:'application/zip'}));
+   status.textContent='Game downloaded. Loading the DS emulator…';
+  } else window.EJS_gameUrl=selected.url;
+  window.EJS_onGameStart=()=>{status.textContent='';};
+  const loader=document.createElement('script');
+  loader.src=window.EJS_pathtodata+'loader.js';
+  loader.onerror=()=>{document.getElementById('error').textContent='The emulator could not load. Check whether cdn.emulatorjs.org is accessible.';};
+  document.body.appendChild(loader);
+ } catch(error) {status.textContent='';document.getElementById('error').textContent=error.message+' Reload the page to retry.';}
+}
+startPlayer();
 </script>
-<script src="https://cdn.emulatorjs.org/stable/data/loader.js" onerror="document.getElementById('error').textContent='The emulator could not load. Check your connection and whether cdn.emulatorjs.org is accessible.'"></script>
 </body></html>
